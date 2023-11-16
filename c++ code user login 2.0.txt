@@ -1,0 +1,309 @@
+#include <iostream>
+#include <vector>
+#include <string>
+#include <algorithm>
+#include <ctime>
+#include <cstdlib>
+#include <map>
+
+class User {
+public:
+    User(const std::string& username, const std::string& password)
+        : username(username), password(password) {
+        initializePortfolio();
+    }
+
+    const std::string& getUsername() const {
+        return username;
+    }
+
+    const std::string& getPassword() const {
+        return password;
+    }
+
+    const std::map<std::string, int>& getPortfolio() const {
+        return portfolio;
+    }
+
+private:
+    std::string username;
+    std::string password;
+    std::map<std::string, int> portfolio;
+
+    void initializePortfolio() {
+        portfolio = {
+            {"RIL", 100},
+            {"TCS", 54},
+            {"HDFCBANK", 152},
+            {"ITC", 880},
+            {"SBI", 120}
+        };
+    }
+};
+
+class Stock {
+public:
+    Stock(const std::string& symbol, double price, int quantity) : symbol(symbol), price(price), quantity(quantity) {}
+
+    const std::string& getSymbol() const {
+        return symbol;
+    }
+
+    double getPrice() const {
+        return price;
+    }
+
+    int getQuantity() const {
+        return quantity;
+    }
+
+    void buy(int shares) {
+        quantity += shares;
+    }
+
+    void sell(int shares) {
+        if (quantity >= shares) {
+            quantity -= shares;
+        } else {
+            std::cout << "Error: Not enough shares to sell." << std::endl;
+        }
+    }
+
+private:
+    std::string symbol;
+    double price;
+    int quantity;
+};
+
+class StockMarketSimulator {
+public:
+    StockMarketSimulator(std::vector<Stock> initialStocks) : stocks(initialStocks) {
+        std::srand(static_cast<unsigned>(std::time(nullptr)));
+    }
+
+    void displayStocks() const {
+        std::cout << "Available Stocks:" << std::endl;
+        for (const Stock& stock : stocks) {
+            std::cout << stock.getSymbol() << " - Price: ₹" << stock.getPrice() << " - Quantity: " << stock.getQuantity() << std::endl;
+        }
+    }
+
+    void buyStock(const std::string& symbol, int shares) {
+        Stock* stock = findStock(symbol);
+        if (stock) {
+            double cost = stock->getPrice() * shares;
+            if (cash >= cost) {
+                stock->buy(shares);
+                cash -= cost;
+                std::cout << "Bought " << shares << " shares of " << symbol << " for ₹" << cost << std::endl;
+                updatePortfolio(symbol, shares, cost, true);
+            } else {
+                std::cout << "Error: Insufficient funds to buy." << std::endl;
+            }
+        } else {
+            std::cout << "Error: Stock not found." << std::endl;
+        }
+    }
+
+    void sellStock(const std::string& symbol, int shares) {
+        Stock* stock = findStock(symbol);
+        if (stock) {
+            if (stock->getQuantity() >= shares) {
+                double earnings = stock->getPrice() * shares;
+                stock->sell(shares);
+                cash += earnings;
+                std::cout << "Sold " << shares << " shares of " << symbol << " for ₹" << earnings << std::endl;
+                updatePortfolio(symbol, shares, earnings, false);
+            } else {
+                std::cout << "Error: Not enough shares to sell." << std::endl;
+            }
+        } else {
+            std::cout << "Error: Stock not found." << std::endl;
+        }
+    }
+
+    void simulate(int days) {
+        for (int day = 1; day <= days; day++) {
+            std::cout << "Day " << day << std::endl;
+            for (Stock& stock : stocks) {
+                double priceChange = (std::rand() % 21 - 10) / 10.0;
+                double newPrice = stock.getPrice() + priceChange;
+                stock = Stock(stock.getSymbol(), newPrice, stock.getQuantity());
+            }
+            displayStocks();
+            std::cout << "Cash balance: ₹" << cash << std::endl;
+
+            // Simulate buying and selling stocks
+            for (const Stock& stock : stocks) {
+                if (std::rand() % 2 == 0) {
+                    buyStock(stock.getSymbol(), std::rand() % 5);
+                } else {
+                    sellStock(stock.getSymbol(), std::rand() % 5);
+                }
+            }
+
+            std::cout << "Updated Cash balance: ₹" << cash << std::endl;
+            std::cout << "\n";
+        }
+    }
+
+    double getCash() const {
+        return cash;
+    }
+
+    void displayPortfolio(const User& user) const {
+        std::cout << "Portfolio for User: " << user.getUsername() << std::endl;
+        const std::map<std::string, int>& userPortfolio = user.getPortfolio();
+        for (const auto& item : userPortfolio) {
+            const std::string& symbol = item.first;
+            const int shares = item.second;
+            const double investedAmount = findStock(symbol)->getPrice() * shares;
+            const double currentValue = findStock(symbol)->getPrice() * shares;
+            std::cout << symbol << " - Shares: " << shares << " - Invested: ₹" << investedAmount
+                      << " - Current Value: ₹" << currentValue << std::endl;
+        }
+    }
+
+private:
+    std::vector<Stock> stocks;
+    double cash = 1580000.0;
+    std::map<std::string, std::pair<int, std::pair<double, bool>>> portfolio;
+
+    Stock* findStock(const std::string& symbol) const {
+        auto it = std::find_if(stocks.begin(), stocks.end(), [symbol](const Stock& s) {
+            return s.getSymbol() == symbol;
+        });
+        if (it != stocks.end()) {
+            return const_cast<Stock*>(&(*it));
+        }
+        return nullptr;
+    }
+
+    void updatePortfolio(const std::string& symbol, int shares, double amount, bool isBuy) {
+        if (portfolio.find(symbol) != portfolio.end()) {
+            if (isBuy) {
+                portfolio[symbol].first += shares;
+                portfolio[symbol].second.first += amount;
+            } else {
+                portfolio[symbol].first -= shares;
+                if (portfolio[symbol].first == 0) {
+                    portfolio.erase(symbol);
+                }
+            }
+        } else {
+            portfolio[symbol] = {shares, {amount, isBuy}};
+        }
+    }
+};
+
+void displayMenu() {
+    std::cout << "\nMenu Options:" << std::endl;
+    std::cout << "1. Display Stock Prices" << std::endl;
+    std::cout << "2. Buy Stocks" << std::endl;
+    std::cout << "3. Sell Stocks" << std::endl;
+    std::cout << "4. Display Portfolio" << std::endl;
+    std::cout << "5. Simulate Next Day" << std::endl;
+    std::cout << "6. Exit" << std::endl;
+}
+
+int main() {
+    std::vector<Stock> initialStocks = {
+        {"RIL", 2300.0, 100},
+        {"TCS", 3500.0, 54},
+        {"HDFCBANK", 1500.0, 152},
+        {"ITC", 430.0, 880},
+        {"SBI", 580.5, 120}
+    };
+
+    std::vector<User> users;
+
+    // Allow users to register
+    std::string username, password;
+    char registerMoreUsers;
+
+    do {
+        std::cout << "Register a new user:" << std::endl;
+        std::cout << "Username: ";
+        std::cin >> username;
+        std::cout << "Password: ";
+        std::cin >> password;
+
+        users.push_back(User(username, password));
+
+        std::cout << "User registered successfully." << std::endl;
+        std::cout << "Do you want to register another user? (y/n): ";
+        std::cin >> registerMoreUsers;
+    } while (registerMoreUsers == 'y' || registerMoreUsers == 'Y');
+
+    std::string enteredUsername, enteredPassword;
+    bool loggedIn = false;
+
+    while (!loggedIn) {
+        std::cout << "Please log in to access the stock market simulator:" << std::endl;
+        std::cout << "Username: ";
+        std::cin >> enteredUsername;
+        std::cout << "Password: ";
+        std::cin >> enteredPassword;
+
+        for (const User& user : users) {
+            if (user.getUsername() == enteredUsername && user.getPassword() == enteredPassword) {
+                loggedIn = true;
+                break;
+            }
+        }
+
+        if (!loggedIn) {
+            std::cout << "Invalid username or password. Please try again." << std::endl;
+        }
+    }
+
+    StockMarketSimulator simulator(initialStocks);
+
+    int choice;
+
+    while (true) {
+        displayMenu();
+        std::cout << "Enter your choice: ";
+        std::cin >> choice;
+
+        switch (choice) {
+            case 1:
+                simulator.displayStocks();
+                break;
+            case 2: {
+                std::string symbol;
+                int shares;
+                std::cout << "Enter the symbol of the stock you want to buy: ";
+                std::cin >> symbol;
+                std::cout << "Enter the number of shares to buy: ";
+                std::cin >> shares;
+                simulator.buyStock(symbol, shares);
+                break;
+            }
+            case 3: {
+                std::string symbol;
+                int shares;
+                std::cout << "Enter the symbol of the stock you want to sell: ";
+                std::cin >> symbol;
+                std::cout << "Enter the number of shares to sell: ";
+                std::cin >> shares;
+                simulator.sellStock(symbol, shares);
+                break;
+            }
+            case 4:
+                simulator.displayPortfolio(users[0]); // Display the portfolio of the first user
+                break;
+            case 5:
+                simulator.simulate(1); // Simulate the next day
+                break;
+            case 6:
+                std::cout << "Thank you for using the stock market simulator. Goodbye!" << std::endl;
+                return 0;
+            default:
+                std::cout << "Invalid choice. Please try again." << std::endl;
+                break;
+        }
+    }
+
+    return 0;
+}
